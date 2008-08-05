@@ -15,10 +15,14 @@ META.yml
 README
 t/01_compile.t
 t/02_run.t
+t/03_batch.t
 t/97_meta.t
 t/98_pod.t
 t/99_pmv.t
+t/data/bin/echo.bat
 t/data/bin/hello.bat
+t/data/bin/interp.bat
+t/data/bin/perl.exe
 t/data/bin/pl2bat.bat
 t/data/lib/Config.pm
 t/data/lib/CPAN/Config.pm
