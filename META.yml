@@ -1,0 +1,34 @@
+---
+abstract: 'Modify a Perl distribution to make it portable'
+author:
+  - 'Adam Kennedy <adamk@cpan.org>'
+build_requires:
+  File::Copy::Recursive: 0.35
+  File::Remove: 1.42
+  Test::More: 0.47
+distribution_type: module
+generated_by: 'Module::Install version 0.76'
+license: perl
+meta-spec:
+  url: http://module-build.sourceforge.net/META-spec-v1.4.html
+  version: 1.4
+module_name: Portable::Dist
+name: Portable-Dist
+no_index:
+  directory:
+    - inc
+    - t
+requires:
+  Carp: 0
+  File::Find::Rule: 0.30
+  File::IgnoreReadonly: 0.01
+  File::Slurp: 9999.13
+  File::Spec: 0.80
+  File::chmod: 0.32
+  Object::Tiny: 1.04
+  Params::Util: 0.31
+  Tie::Slurp: 0.03
+  perl: 5.8.0
+resources:
+  license: http://dev.perl.org/licenses/
+version: 0.01
