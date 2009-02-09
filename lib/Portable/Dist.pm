@@ -37,17 +37,14 @@ use Carp                 ();
 use Tie::Slurp           ();
 use File::Spec           ();
 use File::Path           ();
-use File::Slurp          'write_file';
+use File::Slurp          ();
 use File::Find::Rule     ();
 use File::IgnoreReadonly ();
 use Params::Util         '_STRING'; 
 
-use vars qw{$VERSION};
-BEGIN {
-	$VERSION = '0.02';
-}
+our $VERSION = '0.03';
 
-use constant WIN32 => ( $^O eq 'MSWin32' );
+use constant MSWin32 => ( $^O eq 'MSWin32' );
 
 use Object::Tiny qw{
 	perl_root
@@ -61,7 +58,6 @@ use Object::Tiny qw{
 	minicpan_dir
 	minicpan_conf
 };
-
 
 
 
@@ -207,10 +203,11 @@ sub create_minicpan_conf {
 		$file,
 		"class: CPAN::Mini::Portable\n",
 		"skip_perl: 1\n",
+		"no_conn_cache: 1\n",
 	);
 
 	# Make the file readonly
-	if ( WIN32 ) {
+	if ( MSWin32 ) {
 		require Win32::File::Object;
 		Win32::File::Object->new( $file, 1 )->readonly(1);
 	} else {
@@ -231,7 +228,7 @@ sub modify_batch_files {
 	}
 
 	# Process the files
-	my $prepend = '%~dp0perl.exe';
+	my $prepend = '"%~dp0perl.exe"';
 	foreach my $file ( @files ) {
 		# Apply the change to the file
 		my $guard = File::IgnoreReadonly->new( $file );
@@ -246,7 +243,7 @@ sub modify_batch_files {
 sub modify_pl2bat {
 	my $self    = shift;
 	my $file    = $self->pl2bat;
-	my $prepend = '%~dp0perl.exe';
+	my $prepend = '"%~dp0perl.exe"';
 	my $append  = <<'END_PERL';
 eval {
 	require Portable;
@@ -292,11 +289,11 @@ Adam Kennedy E<lt>adamk@cpan.orgE<gt>
 
 =head1 SEE ALSO
 
-L<Portable>, L<http://win32.perl.org/>
+L<Portable>, L<http://win32.perl.org/>, L<http://strawberryperl.com/>
 
 =head1 COPYRIGHT
 
-Copyright 2008 Adam Kennedy.
+Copyright 2008 - 2009 Adam Kennedy.
 
 This program is free software; you can redistribute
 it and/or modify it under the same terms as Perl itself.
