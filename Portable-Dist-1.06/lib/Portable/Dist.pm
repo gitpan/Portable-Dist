@@ -41,7 +41,7 @@ use File::Find::Rule     ();
 use File::IgnoreReadonly ();
 use Params::Util         '_STRING'; 
 
-our $VERSION = '1.05';
+our $VERSION = '1.06';
 
 use constant MSWin32 => ( $^O eq 'MSWin32' );
 
@@ -51,6 +51,8 @@ use Object::Tiny qw{
 	perl_lib
 	perl_sitelib
 	perl_vendorlib
+	perl_sitebin
+	perl_vendorbin
 	pl2bat
 	config_pm
 	cpan_config
@@ -94,6 +96,16 @@ sub new {
 	unless ( _DIRECTORY($self->perl_sitelib) ) {
 		Carp::croak("Missing or invalid perl_vendorlib directory");
 	}
+
+	$self->{perl_sitebin} ||= File::Spec->catdir( $self->perl_root, 'site', 'bin' );
+	#unless ( _DIRECTORY($self->perl_sitebin) ) {
+	#	Carp::croak("Missing or invalid perl_sitebin directory");
+	#}
+
+	$self->{perl_vendorbin} ||= File::Spec->catdir( $self->perl_root, 'vendor', 'bin' );
+	#unless ( _DIRECTORY($self->perl_sitebin) ) {
+	#	Carp::croak("Missing or invalid perl_vendorbin directory");
+	#}
 
 	# Find some particular files
 	$self->{pl2bat}          = File::Spec->catfile( $self->perl_bin,       'pl2bat.bat'         );
@@ -212,6 +224,7 @@ sub create_minicpan_conf {
 	File::Path::mkpath( $dir, { verbose => 0 } );
 
 	# Write the file
+	my $guard = -f $file ? File::IgnoreReadonly->new( $file ) : 0;
 	write_file(
 		$file,
 		"class: CPAN::Mini::Portable\n",
@@ -234,19 +247,21 @@ sub create_minicpan_conf {
 # Modify existing batch files
 sub modify_batch_files {
 	my $self  = shift;
-	my $dir   = $self->perl_bin;
-	my @files = File::Find::Rule->name('*.bat')->file->in( $dir );
+	my @files;
+	push @files, File::Find::Rule->name('*.bat')->file->in($self->perl_bin);
+	push @files, File::Find::Rule->name('*.bat')->file->in($self->perl_sitebin) if -d $self->perl_sitebin;
+	push @files, File::Find::Rule->name('*.bat')->file->in($self->perl_vendorbin) if -d $self->perl_vendorbin;
 	unless ( @files ) {
 		Carp::croak("Failed to find any batch files");
 	}
 
 	# Process the files
-	my $prepend = '"%~dp0perl.exe"';
 	foreach my $file ( @files ) {
 		# Apply the change to the file
 		my $guard = File::IgnoreReadonly->new( $file );
-                my $content = read_file($file,  binmode=>':utf8') or die "Couldn't read $file";
-		$content =~ s/\nperl -x/\n${prepend} -x/g;
+		my $content = read_file($file,  binmode=>':utf8') or die "Couldn't read $file";
+		$content =~ s/([\r\n])(perl )(-x[^\r\n]*)/$1 . _perl_cmd($3)/sge;
+		$content =~ s/(#line )(\d+)/$1 . ($2+14)/e;  # we have added extra 14 lines
 		write_file($file, {binmode=>':utf8'}, $content);
 	}
 
@@ -256,32 +271,38 @@ sub modify_batch_files {
 sub modify_pl2bat {
 	my $self    = shift;
 	my $file    = $self->pl2bat;
-	my $prepend = '"%~dp0perl.exe"';
-	my $append  = <<'END_PERL';
-eval {
-	require Portable;
-	Portable->import('HomeDir');
-};
-END_PERL
 
 	# Apply the change to the file
 	my $guard   = File::IgnoreReadonly->new( $file );
-        my $content = read_file($file,  binmode=>':utf8') or die "Couldn't read $file";
-	$content =~ s/\bperl \$/${prepend} \$/g;
+	my $content = read_file($file,  binmode=>':utf8') or die "Couldn't read $file";
+	$content =~ s/\bperl \$OPT\{'(a|o|n)'\}/_perl_cmd('$OPT{\'' . $1 .'\'}', 1, 1)/esg;
 	write_file($file, {binmode=>':utf8'}, $content);
 
 	return 1;
 }
-
-
-
-
 
 #####################################################################
 # Support Functions
 
 sub _DIRECTORY {
 	(defined _STRING($_[0]) and -d $_[0]) ? $_[0] : undef;
+}
+
+sub _perl_cmd {
+  my ($arg, $tab, $quote) = @_;
+  my $rv = <<'MARKER';
+IF EXIST "%~dp0perl.exe" (
+"%~dp0perl.exe" XXX_XXX
+) ELSE IF EXIST "%~dp0..\..\bin\perl.exe" (
+"%~dp0..\..\bin\perl.exe" XXX_XXX
+) ELSE (
+perl XXX_XXX
+)
+MARKER
+  $rv =~ s/XXX_XXX/$arg/sg;
+  $rv =~ s/([\%\\])/\\$1/sg if $quote;
+  $rv =~ s/([\r\n]+)/$1\t/sg if $tab;
+  return $rv;
 }
 
 1;
